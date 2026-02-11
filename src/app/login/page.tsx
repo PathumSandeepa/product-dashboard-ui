@@ -9,17 +9,14 @@ import {
    CardHeader,
    CardTitle,
 } from "@/components/ui/card";
-import {
-   Field,
-   FieldDescription,
-   FieldGroup,
-   FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent } from "react";
 
 export default function LoginPage() {
+   const router = useRouter();
+
    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       const formData = new FormData(e.currentTarget);
@@ -29,6 +26,7 @@ export default function LoginPage() {
       };
       console.log("Login data:", data);
       // TODO: Implement API call later
+      router.push("/dashboard");
    };
 
    return (
