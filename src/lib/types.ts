@@ -21,3 +21,37 @@ export const categories = [
 export function capitalize(s: string) {
    return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+export interface User {
+   id: number;
+   name: string;
+   email: string;
+   email_verified_at: string | null;
+   created_at: string;
+   updated_at: string;
+}
+
+export interface AuthResponse {
+   message: string;
+   access_token: string;
+   token_type: string;
+   expires_in: number;
+   user: User;
+}
+
+export interface ValidationErrorResponse {
+   message: string;
+   errors?: Record<string, string[]>;
+}
+
+export interface LoginFormData {
+   email: string;
+   password: string;
+}
+
+export interface RegisterFormData {
+   name: string;
+   email: string;
+   password: string;
+   password_confirmation: string;
+}
