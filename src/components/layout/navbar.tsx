@@ -3,17 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, LogOut } from "lucide-react";
-
-const currentUser = {
-   id: 1,
-   name: "Admin User",
-   email: "admin@rightmo.com",
-   email_verified_at: "2026-02-11T10:00:00.000000Z",
-   created_at: "2026-02-11T10:00:00.000000Z",
-   updated_at: "2026-02-11T10:00:00.000000Z",
-};
+import { useAuthStore } from "@/store/auth-store";
 
 export default function Navbar() {
+   const { user, logout } = useAuthStore();
    const [isProfileOpen, setIsProfileOpen] = useState(false);
    const profileRef = useRef<HTMLDivElement>(null);
 
@@ -52,17 +45,17 @@ export default function Navbar() {
                   <div className="absolute right-0 mt-2 w-72 rounded-xl border bg-popover text-popover-foreground shadow-lg p-4 animate-in fade-in-0 zoom-in-95">
                      <div className="flex items-center gap-3 pb-3 border-b">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                           {currentUser.name
+                           {(user?.name ?? "U")
                               .split(" ")
                               .map((n) => n[0])
                               .join("")}
                         </div>
                         <div className="min-w-0">
                            <p className="font-medium text-sm truncate">
-                              {currentUser.name}
+                              {user?.name ?? "User"}
                            </p>
                            <p className="text-xs text-muted-foreground truncate">
-                              {currentUser.email}
+                              {user?.email ?? ""}
                            </p>
                         </div>
                      </div>
@@ -72,16 +65,22 @@ export default function Navbar() {
                            <span className="text-muted-foreground">
                               Email verified
                            </span>
-                           <span className="text-green-500 text-xs font-medium">
-                              ✓ Verified
-                           </span>
+                           {user?.email_verified_at ? (
+                              <span className="text-green-500 text-xs font-medium">
+                                 ✓ Verified
+                              </span>
+                           ) : (
+                              <span className="text-yellow-500 text-xs font-medium">
+                                 ✗ Unverified
+                              </span>
+                           )}
                         </div>
                         <div className="flex justify-between">
                            <span className="text-muted-foreground">
                               Member since
                            </span>
                            <span className="text-xs">
-                              {currentUser.created_at.split("T")[0]}
+                              {user?.created_at?.split("T")[0] ?? "—"}
                            </span>
                         </div>
                      </div>
@@ -91,7 +90,10 @@ export default function Navbar() {
                            variant="outline"
                            size="sm"
                            className="w-full"
-                           onClick={() => (window.location.href = "/login")}
+                           onClick={() => {
+                              logout();
+                              window.location.href = "/login";
+                           }}
                         >
                            <LogOut className="size-4" />
                            Logout

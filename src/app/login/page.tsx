@@ -11,22 +11,63 @@ import {
 } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function LoginPage() {
    const router = useRouter();
+   const { login, loading } = useAuthStore();
 
-   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+   const [errors, setErrors] = useState<Record<string, string>>({});
+   const [generalError, setGeneralError] = useState("");
+
+   const validate = (email: string, password: string) => {
+      const errs: Record<string, string> = {};
+
+      if (!email.trim()) {
+         errs.email = "The email address is required.";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+         errs.email = "Please provide a valid email address.";
+      }
+
+      if (!password) {
+         errs.password = "The password is required.";
+      }
+
+      return errs;
+   };
+
+   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      setErrors({});
+      setGeneralError("");
+
       const formData = new FormData(e.currentTarget);
-      const data = {
-         email: formData.get("email"),
-         password: formData.get("password"),
-      };
-      console.log("Login data:", data);
-      // TODO: Implement API call later
-      router.push("/dashboard");
+      const email = (formData.get("email") as string) ?? "";
+      const password = (formData.get("password") as string) ?? "";
+
+      const validationErrors = validate(email, password);
+      if (Object.keys(validationErrors).length > 0) {
+         setErrors(validationErrors);
+         return;
+      }
+
+      const result = await login({ email, password });
+
+      if (result.ok) {
+         router.push("/dashboard");
+      } else {
+         if (result.errors) {
+            const fieldErrors: Record<string, string> = {};
+            for (const [key, msgs] of Object.entries(result.errors)) {
+               fieldErrors[key] = msgs[0];
+            }
+            setErrors(fieldErrors);
+         }
+         setGeneralError(result.message);
+      }
    };
 
    return (
@@ -50,31 +91,41 @@ export default function LoginPage() {
                               type="email"
                               placeholder="m@example.com"
                               defaultValue="admin@rightmo.com"
-                              required
                            />
+                           {errors.email && (
+                              <p className="text-sm text-destructive">
+                                 {errors.email}
+                              </p>
+                           )}
                         </Field>
                         <Field>
-                           <div className="flex items-center">
-                              <FieldLabel htmlFor="password">
-                                 Password
-                              </FieldLabel>
-                              <a
-                                 href="#"
-                                 className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                              >
-                                 Forgot your password?
-                              </a>
-                           </div>
+                           <FieldLabel htmlFor="password">Password</FieldLabel>
                            <Input
                               id="password"
                               name="password"
                               type="password"
                               defaultValue="password"
-                              required
                            />
+                           {errors.password && (
+                              <p className="text-sm text-destructive">
+                                 {errors.password}
+                              </p>
+                           )}
                         </Field>
+
+                        {generalError && (
+                           <p className="text-sm text-destructive text-center">
+                              {generalError}
+                           </p>
+                        )}
+
                         <Field>
-                           <Button type="submit" className="w-full">
+                           <Button
+                              type="submit"
+                              className="w-full"
+                              disabled={loading}
+                           >
+                              {loading && <Spinner />}
                               Login
                            </Button>
                            <Button
