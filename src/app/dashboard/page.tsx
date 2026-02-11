@@ -1,20 +1,28 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, FormEvent } from "react";
 import {
    Search,
    Star,
+   Plus,
+   MoreVertical,
+   Pencil,
+   Trash2,
    ChevronLeft,
    ChevronRight,
    ChevronsLeft,
    ChevronsRight,
    X,
 } from "lucide-react";
+
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
+import { ProductImage } from "@/components/product-image";
+
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import {
    Table,
    TableHeader,
@@ -23,233 +31,46 @@ import {
    TableHead,
    TableCell,
 } from "@/components/ui/table";
+import {
+   Dialog,
+   DialogContent,
+   DialogHeader,
+   DialogFooter,
+   DialogTitle,
+   DialogDescription,
+} from "@/components/ui/dialog";
+import {
+   DropdownMenu,
+   DropdownMenuTrigger,
+   DropdownMenuContent,
+   DropdownMenuItem,
+   DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+   Field,
+   FieldGroup,
+   FieldLabel,
+   FieldDescription,
+} from "@/components/ui/field";
 
-interface Product {
-   id: number;
-   title: string;
-   description: string;
-   price: string;
-   category: string;
-   image: string;
-   rating: { rate: number; count: number };
-}
+import { useProductStore } from "@/store/product-store";
+import type { Product, ProductFormData } from "@/lib/types";
+import { categories, capitalize } from "@/lib/types";
 
-const mockProducts: Product[] = [
-   {
-      id: 1,
-      title: "Fjallraven - Foldsack No. 1 Backpack",
-      description:
-         "Your perfect pack for everyday use and walks in the forest. Stash your laptop up to 15 inches in the padded sleeve.",
-      price: "109.95",
-      category: "men's clothing",
-      image: "https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg",
-      rating: { rate: 3.9, count: 120 },
-   },
-   {
-      id: 2,
-      title: "Mens Casual Premium Slim Fit T-Shirts",
-      description:
-         "Slim-fitting style, contrast raglan long sleeve, three-button henley placket.",
-      price: "22.30",
-      category: "men's clothing",
-      image: "https://fakestoreapi.com/img/71-3HjGNDUL._AC_SY879._SX._UX._SY._UY_.jpg",
-      rating: { rate: 4.1, count: 259 },
-   },
-   {
-      id: 3,
-      title: "Mens Cotton Jacket",
-      description:
-         "Great outerwear jackets for Spring/Autumn/Winter, suitable for many occasions.",
-      price: "55.99",
-      category: "men's clothing",
-      image: "https://fakestoreapi.com/img/71li-ujtlUL._AC_UX679_.jpg",
-      rating: { rate: 4.7, count: 500 },
-   },
-   {
-      id: 4,
-      title: "Mens Casual Slim Fit",
-      description:
-         "The color could be slightly different between on the screen and in practice.",
-      price: "15.99",
-      category: "men's clothing",
-      image: "https://fakestoreapi.com/img/71YXzeOuslL._AC_UY879_.jpg",
-      rating: { rate: 2.1, count: 430 },
-   },
-   {
-      id: 5,
-      title: "John Hardy Women's Gold Dragon Bracelet",
-      description:
-         "From our Legends Collection, the Naga was inspired by the mythical water dragon.",
-      price: "695.00",
-      category: "jewelery",
-      image: "https://fakestoreapi.com/img/71pWzhdJNwL._AC_UL640_QL65_ML3_.jpg",
-      rating: { rate: 4.6, count: 400 },
-   },
-   {
-      id: 6,
-      title: "Solid Gold Petite Micropave",
-      description:
-         "Satisfaction Guaranteed. Return or exchange any order within 30 days.",
-      price: "168.00",
-      category: "jewelery",
-      image: "https://fakestoreapi.com/img/61sbMiUnoGL._AC_UL640_QL65_ML3_.jpg",
-      rating: { rate: 3.9, count: 70 },
-   },
-   {
-      id: 7,
-      title: "White Gold Plated Princess",
-      description:
-         "Classic Created Wedding Engagement Solitaire Diamond Promise Ring for Her.",
-      price: "9.99",
-      category: "jewelery",
-      image: "https://fakestoreapi.com/img/71YAIFU48IL._AC_UL640_QL65_ML3_.jpg",
-      rating: { rate: 3.0, count: 400 },
-   },
-   {
-      id: 8,
-      title: "Pierced Owl Rose Gold Plated Stainless Steel",
-      description:
-         "Rose Gold Plated Double Flared Tunnel Plug Earrings. Made of 316L Stainless Steel.",
-      price: "10.99",
-      category: "jewelery",
-      image: "https://fakestoreapi.com/img/51UDEzMJVpL._AC_UL640_QL65_ML3_.jpg",
-      rating: { rate: 1.9, count: 100 },
-   },
-   {
-      id: 9,
-      title: "WD 2TB Elements Portable External Hard Drive",
-      description:
-         "USB 3.0 and USB 2.0 Compatibility. Fast data transfers. Improve PC Performance.",
-      price: "64.00",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/61IBBVJvSDL._AC_SY879_.jpg",
-      rating: { rate: 3.3, count: 203 },
-   },
-   {
-      id: 10,
-      title: "SanDisk SSD PLUS 1TB Internal SSD",
-      description:
-         "Easy upgrade for faster boot up, shutdown, application load and response.",
-      price: "109.00",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/61U7T1koQqL._AC_SX679_.jpg",
-      rating: { rate: 2.9, count: 470 },
-   },
-   {
-      id: 11,
-      title: "Silicon Power 256GB SSD",
-      description:
-         "3D NAND flash are applied to deliver high transfer speeds to enhance overall system performance.",
-      price: "109.00",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/71kWymZ+c+L._AC_SX679_.jpg",
-      rating: { rate: 4.8, count: 319 },
-   },
-   {
-      id: 12,
-      title: "WD 4TB Gaming Drive Works with Playstation 4",
-      description:
-         "Expand your PS4 gaming experience. Portable design lets you enjoy great games wherever you go.",
-      price: "114.00",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/61mtL65D4cL._AC_SX679_.jpg",
-      rating: { rate: 4.8, count: 400 },
-   },
-   {
-      id: 13,
-      title: "Acer SB220Q bi 21.5 Inches Full HD Monitor",
-      description:
-         "21.5 inches Full HD (1920 x 1080) widescreen IPS display. Ultra-thin zero frame design.",
-      price: "599.00",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/81QpkIctqPL._AC_SX679_.jpg",
-      rating: { rate: 2.9, count: 250 },
-   },
-   {
-      id: 14,
-      title: "Samsung 49-Inch CHG90 144Hz Curved Gaming Monitor",
-      description:
-         "49-Inch CHG90 with a steep 1800R curve. Super ultra-wide 32:9 aspect ratio.",
-      price: "999.99",
-      category: "electronics",
-      image: "https://fakestoreapi.com/img/81Zt42iIapL._AC_SX679_.jpg",
-      rating: { rate: 2.2, count: 140 },
-   },
-   {
-      id: 15,
-      title: "BIYLACLESEN Women's 3-in-1 Snowboard Jacket",
-      description:
-         "Note: The Jackets is US standard size. Please choose size to go to Amazon for detailed size chart.",
-      price: "56.99",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/51Y5NI-I5jL._AC_UX679_.jpg",
-      rating: { rate: 2.6, count: 235 },
-   },
-   {
-      id: 16,
-      title: "Lock and Love Women's Removable Hooded Leather Jacket",
-      description:
-         "100% Polyurethane (shell) 100% Polyester (lining). Removable hooded faux leather moto jacket.",
-      price: "29.95",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/81XH0e8fefL._AC_UY879_.jpg",
-      rating: { rate: 2.9, count: 340 },
-   },
-   {
-      id: 17,
-      title: "Rain Jacket Women Windbreaker Striped Climbing",
-      description:
-         "Lightweight perfect for trip or casual wear. Wind-proof and keeps you warm in cold weather.",
-      price: "39.99",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/71HblAHs5xL._AC_UY879_-2.jpg",
-      rating: { rate: 3.8, count: 679 },
-   },
-   {
-      id: 18,
-      title: "MBJ Women's Solid Short Sleeve Boat Neck V",
-      description:
-         "95% RAYON 5% SPANDEX. Made in USA. Lightweight fabric with great stretch for comfort.",
-      price: "9.85",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/71z3kpMAYsL._AC_UY879_.jpg",
-      rating: { rate: 4.7, count: 130 },
-   },
-   {
-      id: 19,
-      title: "Opna Women's Short Sleeve Moisture",
-      description:
-         "100% Polyester. Machine Wash & Pre Shrunk for a Great Fit. Lightweight moisture-wicking fabric.",
-      price: "7.95",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/51eg55uWmdL._AC_UX679_.jpg",
-      rating: { rate: 4.5, count: 146 },
-   },
-   {
-      id: 20,
-      title: "DANVOUY Womens T Shirt Casual Cotton Short",
-      description:
-         "95% Cotton, 5% Spandex. Features: Casual, Short Sleeve, Letter Print, V-Neck.",
-      price: "12.99",
-      category: "women's clothing",
-      image: "https://fakestoreapi.com/img/61pHAEJ4NML._AC_UX679_.jpg",
-      rating: { rate: 3.6, count: 145 },
-   },
-];
-
-const categories = [
-   "All",
-   "men's clothing",
-   "women's clothing",
-   "electronics",
-   "jewelery",
-];
-
-function capitalize(s: string) {
-   return s.charAt(0).toUpperCase() + s.slice(1);
-}
+const emptyForm: ProductFormData = {
+   title: "",
+   description: "",
+   price: "",
+   category: "electronics",
+   image: "",
+   rating: { rate: 0, count: 0 },
+};
 
 export default function DashboardPage() {
+   const { products, loading, addProduct, updateProduct, deleteProduct } =
+      useProductStore();
+
+   // Filters
    const [search, setSearch] = useState("");
    const [category, setCategory] = useState("All");
    const [minPrice, setMinPrice] = useState("");
@@ -258,8 +79,19 @@ export default function DashboardPage() {
    const [currentPage, setCurrentPage] = useState(1);
    const [rowsPerPage, setRowsPerPage] = useState(10);
 
+   // Dialogs
+   const [viewProduct, setViewProduct] = useState<Product | null>(null);
+   const [addOpen, setAddOpen] = useState(false);
+   const [editProduct, setEditProduct] = useState<Product | null>(null);
+   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+   const [saving, setSaving] = useState(false);
+
+   const [form, setForm] = useState<ProductFormData>(emptyForm);
+
+   // ---- filter + sort -----------------------------------------------------
+
    const filteredProducts = useMemo(() => {
-      let result = [...mockProducts];
+      let result = [...products];
 
       if (search) {
          const q = search.toLowerCase();
@@ -295,7 +127,9 @@ export default function DashboardPage() {
       }
 
       return result;
-   }, [search, category, minPrice, maxPrice, sort]);
+   }, [products, search, category, minPrice, maxPrice, sort]);
+
+   // ---- pagination --------------------------------------------------------
 
    const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
    const paginatedProducts = filteredProducts.slice(
@@ -315,18 +149,186 @@ export default function DashboardPage() {
    const hasActiveFilters =
       search || category !== "All" || minPrice || maxPrice || sort;
 
+   // ---- add product -------------------------------------------------------
+
+   const openAddDialog = () => {
+      setForm(emptyForm);
+      setAddOpen(true);
+   };
+
+   const handleAdd = (e: FormEvent) => {
+      e.preventDefault();
+      setSaving(true);
+      // TODO: replace with API POST /api/products
+      setTimeout(() => {
+         addProduct(form);
+         setSaving(false);
+         setAddOpen(false);
+      }, 400);
+   };
+
+   // ---- edit product ------------------------------------------------------
+
+   const openEditDialog = (product: Product) => {
+      setForm({
+         title: product.title,
+         description: product.description,
+         price: product.price,
+         category: product.category,
+         image: product.image,
+         rating: { ...product.rating },
+      });
+      setEditProduct(product);
+   };
+
+   const handleEdit = (e: FormEvent) => {
+      e.preventDefault();
+      if (!editProduct) return;
+      setSaving(true);
+      // TODO: replace with API PUT /api/products/{id}
+      setTimeout(() => {
+         updateProduct(editProduct.id, form);
+         setSaving(false);
+         setEditProduct(null);
+      }, 400);
+   };
+
+   // ---- delete product ----------------------------------------------------
+
+   const handleDelete = () => {
+      if (!deleteTarget) return;
+      setSaving(true);
+      // TODO: replace with API DELETE /api/products/{id}
+      setTimeout(() => {
+         deleteProduct(deleteTarget.id);
+         setSaving(false);
+         setDeleteTarget(null);
+      }, 400);
+   };
+
+   // ---- shared form fields ------------------------------------------------
+
+   const renderProductForm = () => (
+      <FieldGroup>
+         <Field>
+            <FieldLabel htmlFor="title">Title</FieldLabel>
+            <Input
+               id="title"
+               value={form.title}
+               onChange={(e) => setForm({ ...form, title: e.target.value })}
+               required
+            />
+         </Field>
+         <Field>
+            <FieldLabel htmlFor="description">Description</FieldLabel>
+            <Input
+               id="description"
+               value={form.description}
+               onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+               }
+               required
+            />
+         </Field>
+         <div className="grid grid-cols-2 gap-4">
+            <Field>
+               <FieldLabel htmlFor="price">Price</FieldLabel>
+               <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  required
+               />
+            </Field>
+            <Field>
+               <FieldLabel htmlFor="category">Category</FieldLabel>
+               <select
+                  id="category"
+                  value={form.category}
+                  onChange={(e) =>
+                     setForm({ ...form, category: e.target.value })
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background text-sm px-3"
+               >
+                  {categories
+                     .filter((c) => c !== "All")
+                     .map((c) => (
+                        <option key={c} value={c}>
+                           {capitalize(c)}
+                        </option>
+                     ))}
+               </select>
+            </Field>
+         </div>
+         <Field>
+            <FieldLabel htmlFor="image">Image URL</FieldLabel>
+            <Input
+               id="image"
+               type="url"
+               value={form.image}
+               onChange={(e) => setForm({ ...form, image: e.target.value })}
+            />
+            <FieldDescription>
+               Paste the URL of the product image.
+            </FieldDescription>
+         </Field>
+         <div className="grid grid-cols-2 gap-4">
+            <Field>
+               <FieldLabel htmlFor="rate">Rating</FieldLabel>
+               <Input
+                  id="rate"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="5"
+                  value={form.rating.rate}
+                  onChange={(e) =>
+                     setForm({
+                        ...form,
+                        rating: {
+                           ...form.rating,
+                           rate: parseFloat(e.target.value) || 0,
+                        },
+                     })
+                  }
+               />
+            </Field>
+            <Field>
+               <FieldLabel htmlFor="count">Review Count</FieldLabel>
+               <Input
+                  id="count"
+                  type="number"
+                  min="0"
+                  value={form.rating.count}
+                  onChange={(e) =>
+                     setForm({
+                        ...form,
+                        rating: {
+                           ...form.rating,
+                           count: parseInt(e.target.value) || 0,
+                        },
+                     })
+                  }
+               />
+            </Field>
+         </div>
+      </FieldGroup>
+   );
+
    return (
       <div className="min-h-screen flex flex-col bg-background">
          <Navbar />
 
          <main className="flex-1 pt-14">
-            <div className="p-4 md:p-8 space-y-6">
+            <div className="px-6 md:px-12 py-6 space-y-6 max-w-7xl mx-auto">
                {/* Search */}
-               <div className="relative">
+               <div className="relative max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
                      type="text"
-                     placeholder="Search products by title or description..."
+                     placeholder="Search products..."
                      value={search}
                      onChange={(e) => {
                         setSearch(e.target.value);
@@ -336,7 +338,7 @@ export default function DashboardPage() {
                   />
                </div>
 
-               {/* Filters */}
+               {/* Filters + Add Product */}
                <div className="flex flex-wrap items-center gap-3">
                   <select
                      value={category}
@@ -384,86 +386,129 @@ export default function DashboardPage() {
                      className="h-9 rounded-md border border-input bg-background text-sm px-3 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                      <option value="">Sort by</option>
-                     <option value="price_asc">Price: Low → High</option>
-                     <option value="price_desc">Price: High → Low</option>
+                     <option value="price_asc">Price: Low High</option>
+                     <option value="price_desc">Price: High Low</option>
                      <option value="newest">Newest First</option>
                   </select>
 
                   {hasActiveFilters && (
                      <Button variant="ghost" size="sm" onClick={clearFilters}>
                         <X className="size-4" />
-                        Clear Filters
+                        Clear
                      </Button>
                   )}
+
+                  <div className="ml-auto">
+                     <Button onClick={openAddDialog}>
+                        <Plus className="size-4" />
+                        Add Product
+                     </Button>
+                  </div>
                </div>
 
+               {/* Loading */}
+               {loading && (
+                  <div className="flex justify-center py-12">
+                     <Spinner className="size-6" />
+                  </div>
+               )}
+
                {/* Data Table */}
-               <div className="rounded-xl border">
-                  <Table>
-                     <TableHeader>
-                        <TableRow>
-                           <TableHead className="min-w-45">Title</TableHead>
-                           <TableHead className="min-w-62.5">
-                              Description
-                           </TableHead>
-                           <TableHead>Price</TableHead>
-                           <TableHead>Category</TableHead>
-                           <TableHead>Image</TableHead>
-                           <TableHead>Rating</TableHead>
-                        </TableRow>
-                     </TableHeader>
-                     <TableBody>
-                        {paginatedProducts.length > 0 ? (
-                           paginatedProducts.map((product) => (
-                              <TableRow key={product.id}>
-                                 <TableCell className="font-medium">
-                                    {product.title}
-                                 </TableCell>
-                                 <TableCell className="text-muted-foreground max-w-75 truncate">
-                                    {product.description}
-                                 </TableCell>
-                                 <TableCell className="tabular-nums">
-                                    ${product.price}
-                                 </TableCell>
-                                 <TableCell>
-                                    <Badge variant="secondary">
-                                       {capitalize(product.category)}
-                                    </Badge>
-                                 </TableCell>
-                                 <TableCell>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                       src={product.image}
-                                       alt={product.title}
-                                       className="size-10 rounded object-cover"
-                                    />
-                                 </TableCell>
-                                 <TableCell>
-                                    <div className="flex items-center gap-1">
-                                       <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
-                                       <span className="text-sm">
-                                          {product.rating.rate}
+               {!loading && (
+                  <div className="rounded-xl border">
+                     <Table>
+                        <TableHeader>
+                           <TableRow>
+                              <TableHead className="min-w-48">Title</TableHead>
+                              <TableHead>Price</TableHead>
+                              <TableHead>Category</TableHead>
+                              <TableHead>Rating</TableHead>
+                              <TableHead className="w-10" />
+                           </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                           {paginatedProducts.length > 0 ? (
+                              paginatedProducts.map((product) => (
+                                 <TableRow
+                                    key={product.id}
+                                    className="cursor-pointer"
+                                    onClick={() => setViewProduct(product)}
+                                 >
+                                    <TableCell className="font-medium">
+                                       {product.title}
+                                    </TableCell>
+                                    <TableCell className="tabular-nums">
+                                       ${product.price}
+                                    </TableCell>
+                                    <TableCell>
+                                       <Badge variant="secondary">
+                                          {capitalize(product.category)}
+                                       </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                       <div className="flex items-center gap-1">
+                                          <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
+                                          <span className="text-sm">
+                                             {product.rating.rate}
+                                          </span>
+                                       </div>
+                                       <span className="text-xs text-muted-foreground">
+                                          {product.rating.count} reviews
                                        </span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground">
-                                       {product.rating.count} reviews
-                                    </span>
+                                    </TableCell>
+                                    <TableCell>
+                                       <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                             <Button
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                onClick={(e) =>
+                                                   e.stopPropagation()
+                                                }
+                                             >
+                                                <MoreVertical className="size-4" />
+                                             </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                             <DropdownMenuItem
+                                                onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   openEditDialog(product);
+                                                }}
+                                             >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                             </DropdownMenuItem>
+                                             <DropdownMenuSeparator />
+                                             <DropdownMenuItem
+                                                className="text-destructive focus:text-destructive"
+                                                onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   setDeleteTarget(product);
+                                                }}
+                                             >
+                                                <Trash2 className="size-4" />
+                                                Delete
+                                             </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                       </DropdownMenu>
+                                    </TableCell>
+                                 </TableRow>
+                              ))
+                           ) : (
+                              <TableRow>
+                                 <TableCell
+                                    colSpan={5}
+                                    className="h-24 text-center"
+                                 >
+                                    No products found.
                                  </TableCell>
                               </TableRow>
-                           ))
-                        ) : (
-                           <TableRow>
-                              <TableCell
-                                 colSpan={6}
-                                 className="h-24 text-center"
-                              >
-                                 No products found.
-                              </TableCell>
-                           </TableRow>
-                        )}
-                     </TableBody>
-                  </Table>
-               </div>
+                           )}
+                        </TableBody>
+                     </Table>
+                  </div>
+               )}
 
                {/* Pagination */}
                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
@@ -530,6 +575,156 @@ export default function DashboardPage() {
          </main>
 
          <Footer />
+
+         {/* VIEW PRODUCT DIALOG                                              */}
+         <Dialog
+            open={!!viewProduct}
+            onOpenChange={(open) => !open && setViewProduct(null)}
+         >
+            <DialogContent className="sm:max-w-lg">
+               <DialogHeader>
+                  <DialogTitle>{viewProduct?.title}</DialogTitle>
+                  <DialogDescription>Product details</DialogDescription>
+               </DialogHeader>
+
+               {viewProduct && (
+                  <div className="space-y-4">
+                     <ProductImage
+                        src={viewProduct.image}
+                        alt={viewProduct.title}
+                        className="w-full h-48 object-contain bg-muted"
+                     />
+
+                     <p className="text-sm text-muted-foreground">
+                        {viewProduct.description}
+                     </p>
+
+                     <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                           <span className="text-muted-foreground">Price</span>
+                           <p className="font-semibold tabular-nums">
+                              ${viewProduct.price}
+                           </p>
+                        </div>
+                        <div>
+                           <span className="text-muted-foreground">
+                              Category
+                           </span>
+                           <p>
+                              <Badge variant="secondary">
+                                 {capitalize(viewProduct.category)}
+                              </Badge>
+                           </p>
+                        </div>
+                        <div>
+                           <span className="text-muted-foreground">Rating</span>
+                           <div className="flex items-center gap-1">
+                              <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
+                              <span>{viewProduct.rating.rate}</span>
+                           </div>
+                        </div>
+                        <div>
+                           <span className="text-muted-foreground">
+                              Reviews
+                           </span>
+                           <p>{viewProduct.rating.count}</p>
+                        </div>
+                     </div>
+                  </div>
+               )}
+            </DialogContent>
+         </Dialog>
+
+         {/* ADD PRODUCT DIALOG                                               */}
+         <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogContent className="sm:max-w-lg">
+               <DialogHeader>
+                  <DialogTitle>Add Product</DialogTitle>
+                  <DialogDescription>
+                     Fill in the details to create a new product.
+                  </DialogDescription>
+               </DialogHeader>
+               <form onSubmit={handleAdd}>
+                  {renderProductForm()}
+                  <DialogFooter className="mt-4">
+                     <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setAddOpen(false)}
+                     >
+                        Cancel
+                     </Button>
+                     <Button type="submit" disabled={saving}>
+                        {saving && <Spinner />}
+                        Create
+                     </Button>
+                  </DialogFooter>
+               </form>
+            </DialogContent>
+         </Dialog>
+
+         {/* EDIT PRODUCT DIALOG                                              */}
+         <Dialog
+            open={!!editProduct}
+            onOpenChange={(open) => !open && setEditProduct(null)}
+         >
+            <DialogContent className="sm:max-w-lg">
+               <DialogHeader>
+                  <DialogTitle>Edit Product</DialogTitle>
+                  <DialogDescription>
+                     Update the product information.
+                  </DialogDescription>
+               </DialogHeader>
+               <form onSubmit={handleEdit}>
+                  {renderProductForm()}
+                  <DialogFooter className="mt-4">
+                     <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditProduct(null)}
+                     >
+                        Cancel
+                     </Button>
+                     <Button type="submit" disabled={saving}>
+                        {saving && <Spinner />}
+                        Save Changes
+                     </Button>
+                  </DialogFooter>
+               </form>
+            </DialogContent>
+         </Dialog>
+
+         {/* DELETE CONFIRMATION DIALOG                                       */}
+         <Dialog
+            open={!!deleteTarget}
+            onOpenChange={(open) => !open && setDeleteTarget(null)}
+         >
+            <DialogContent className="sm:max-w-sm">
+               <DialogHeader>
+                  <DialogTitle>Delete Product</DialogTitle>
+                  <DialogDescription>
+                     Are you sure you want to delete &ldquo;
+                     {deleteTarget?.title}&rdquo;? This action cannot be undone.
+                  </DialogDescription>
+               </DialogHeader>
+               <DialogFooter>
+                  <Button
+                     variant="outline"
+                     onClick={() => setDeleteTarget(null)}
+                  >
+                     Cancel
+                  </Button>
+                  <Button
+                     variant="destructive"
+                     disabled={saving}
+                     onClick={handleDelete}
+                  >
+                     {saving && <Spinner />}
+                     Delete
+                  </Button>
+               </DialogFooter>
+            </DialogContent>
+         </Dialog>
       </div>
    );
 }

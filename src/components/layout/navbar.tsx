@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { User, LogOut } from "lucide-react";
 
-// Mock current user — replace with API call to GET /api/me later
 const currentUser = {
    id: 1,
    name: "Admin User",
@@ -82,9 +81,7 @@ export default function Navbar() {
                               Member since
                            </span>
                            <span className="text-xs">
-                              {new Date(
-                                 currentUser.created_at,
-                              ).toLocaleDateString()}
+                              {currentUser.created_at.split("T")[0]}
                            </span>
                         </div>
                      </div>
