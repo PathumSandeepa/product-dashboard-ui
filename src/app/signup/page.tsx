@@ -126,7 +126,6 @@ export default function SignupPage() {
                            name="name"
                            type="text"
                            placeholder="John Doe"
-                           defaultValue="John Doe"
                         />
                         {errors.name && (
                            <p className="text-sm text-destructive">
@@ -141,7 +140,6 @@ export default function SignupPage() {
                            name="email"
                            type="email"
                            placeholder="m@example.com"
-                           defaultValue="john@example.com"
                         />
                         {errors.email && (
                            <p className="text-sm text-destructive">
@@ -155,12 +153,7 @@ export default function SignupPage() {
                      </Field>
                      <Field>
                         <FieldLabel htmlFor="password">Password</FieldLabel>
-                        <Input
-                           id="password"
-                           name="password"
-                           type="password"
-                           defaultValue="password123"
-                        />
+                        <Input id="password" name="password" type="password" />
                         {errors.password && (
                            <p className="text-sm text-destructive">
                               {errors.password}
@@ -178,7 +171,6 @@ export default function SignupPage() {
                            id="password_confirmation"
                            name="password_confirmation"
                            type="password"
-                           defaultValue="password123"
                         />
                         {errors.password_confirmation && (
                            <p className="text-sm text-destructive">

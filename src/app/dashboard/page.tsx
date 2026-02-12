@@ -348,7 +348,7 @@ export default function DashboardPage() {
          </Field>
          <div className="grid grid-cols-2 gap-4">
             <Field>
-               <FieldLabel htmlFor="rate">Rating</FieldLabel>
+               <FieldLabel htmlFor="rate">Rating (0-5)</FieldLabel>
                <Input
                   id="rate"
                   type="number"

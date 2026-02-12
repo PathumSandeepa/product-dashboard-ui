@@ -90,7 +90,6 @@ export default function LoginPage() {
                               name="email"
                               type="email"
                               placeholder="m@example.com"
-                              defaultValue="admin@rightmo.com"
                            />
                            {errors.email && (
                               <p className="text-sm text-destructive">
@@ -104,7 +103,6 @@ export default function LoginPage() {
                               id="password"
                               name="password"
                               type="password"
-                              defaultValue="password"
                            />
                            {errors.password && (
                               <p className="text-sm text-destructive">
