@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
    Card,
@@ -9,9 +8,15 @@ import {
    CardHeader,
    CardTitle,
 } from "@/components/ui/card";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+   Field,
+   FieldError,
+   FieldGroup,
+   FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { extractFieldErrors } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
@@ -25,17 +30,10 @@ export default function LoginPage() {
 
    const validate = (email: string, password: string) => {
       const errs: Record<string, string> = {};
-
-      if (!email.trim()) {
-         errs.email = "The email address is required.";
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      if (!email.trim()) errs.email = "The email address is required.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
          errs.email = "Please provide a valid email address.";
-      }
-
-      if (!password) {
-         errs.password = "The password is required.";
-      }
-
+      if (!password) errs.password = "The password is required.";
       return errs;
    };
 
@@ -58,21 +56,16 @@ export default function LoginPage() {
 
       if (result.ok) {
          router.push("/dashboard");
-      } else {
-         if (result.errors) {
-            const fieldErrors: Record<string, string> = {};
-            for (const [key, msgs] of Object.entries(result.errors)) {
-               fieldErrors[key] = msgs[0];
-            }
-            setErrors(fieldErrors);
-         }
-         setGeneralError(result.message);
+         return;
       }
+
+      if (result.errors) setErrors(extractFieldErrors(result.errors));
+      setGeneralError(result.message);
    };
 
    return (
       <div className="flex min-h-screen items-center justify-center p-4">
-         <div className={cn("flex flex-col gap-6 w-full max-w-md")}>
+         <div className="flex flex-col gap-6 w-full max-w-md">
             <Card>
                <CardHeader>
                   <CardTitle>Login to your account</CardTitle>
@@ -91,11 +84,7 @@ export default function LoginPage() {
                               type="email"
                               placeholder="m@example.com"
                            />
-                           {errors.email && (
-                              <p className="text-sm text-destructive">
-                                 {errors.email}
-                              </p>
-                           )}
+                           <FieldError>{errors.email}</FieldError>
                         </Field>
                         <Field>
                            <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -104,18 +93,12 @@ export default function LoginPage() {
                               name="password"
                               type="password"
                            />
-                           {errors.password && (
-                              <p className="text-sm text-destructive">
-                                 {errors.password}
-                              </p>
-                           )}
+                           <FieldError>{errors.password}</FieldError>
                         </Field>
 
-                        {generalError && (
-                           <p className="text-sm text-destructive text-center">
-                              {generalError}
-                           </p>
-                        )}
+                        <FieldError className="text-center">
+                           {generalError}
+                        </FieldError>
 
                         <Field>
                            <Button
@@ -130,7 +113,7 @@ export default function LoginPage() {
                               variant="outline"
                               type="button"
                               className="w-full"
-                              onClick={() => (window.location.href = "/signup")}
+                              onClick={() => router.push("/signup")}
                            >
                               Sign up
                            </Button>

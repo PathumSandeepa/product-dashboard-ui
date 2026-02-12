@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
    Field,
+   FieldError,
    FieldGroup,
    FieldLabel,
    FieldDescription,
@@ -57,8 +58,7 @@ import { useProductStore } from "@/store/product-store";
 import { useAuthStore } from "@/store/auth-store";
 import type { Product, ProductFormData } from "@/lib/types";
 import { categories, capitalize } from "@/lib/types";
-
-// ---------------------------------------------------------------------------
+import { extractFieldErrors } from "@/lib/utils";
 
 const emptyForm: ProductFormData = {
    title: "",
@@ -71,24 +71,55 @@ const emptyForm: ProductFormData = {
 
 function validateProduct(data: ProductFormData) {
    const errs: Record<string, string> = {};
-   if (!data.title.trim()) errs.title = "The product title is required.";
-   else if (data.title.length > 255)
-      errs.title = "Title must not exceed 255 characters.";
-   if (!data.description.trim())
-      errs.description = "The description is required.";
-   if (!data.price && data.price !== "0") errs.price = "The price is required.";
-   else if (Number(data.price) < 0) errs.price = "Price must be 0 or more.";
-   if (!data.category.trim()) errs.category = "The category is required.";
-   if (!data.image.trim()) errs.image = "The image URL is required.";
-   else if (data.image.length > 255)
-      errs.image = "Image URL must not exceed 255 characters.";
-   if (data.rating.rate < 0 || data.rating.rate > 5)
-      errs.rate = "Rating must be between 0 and 5.";
-   if (data.rating.count < 0) errs.count = "Review count must be 0 or more.";
+
+   const setError = (key: string, message: string | undefined) => {
+      if (message) errs[key] = message;
+   };
+
+   const titleError = () => {
+      if (!data.title.trim()) return "The product title is required.";
+      if (data.title.length > 255)
+         return "Title must not exceed 255 characters.";
+   };
+
+   const descriptionError = () => {
+      if (!data.description.trim()) return "The description is required.";
+   };
+
+   const priceError = () => {
+      if (!data.price && data.price !== "0") return "The price is required.";
+      if (Number(data.price) < 0) return "Price must be 0 or more.";
+   };
+
+   const categoryError = () => {
+      if (!data.category.trim()) return "The category is required.";
+   };
+
+   const imageError = () => {
+      if (!data.image.trim()) return "The image URL is required.";
+      if (data.image.length > 255)
+         return "Image URL must not exceed 255 characters.";
+   };
+
+   const ratingRateError = () => {
+      if (data.rating.rate < 0 || data.rating.rate > 5)
+         return "Rating must be between 0 and 5.";
+   };
+
+   const ratingCountError = () => {
+      if (data.rating.count < 0) return "Review count must be 0 or more.";
+   };
+
+   setError("title", titleError());
+   setError("description", descriptionError());
+   setError("price", priceError());
+   setError("category", categoryError());
+   setError("image", imageError());
+   setError("rate", ratingRateError());
+   setError("count", ratingCountError());
+
    return errs;
 }
-
-// ---------------------------------------------------------------------------
 
 export default function DashboardPage() {
    const {
@@ -104,7 +135,6 @@ export default function DashboardPage() {
 
    const token = useAuthStore((s) => s.token);
 
-   // Filters
    const [search, setSearch] = useState("");
    const [category, setCategory] = useState("All");
    const [minPrice, setMinPrice] = useState("");
@@ -112,7 +142,6 @@ export default function DashboardPage() {
    const [sort, setSort] = useState("");
    const [currentPage, setCurrentPage] = useState(1);
 
-   // Dialogs
    const [viewProduct, setViewProduct] = useState<Product | null>(null);
    const [addOpen, setAddOpen] = useState(false);
    const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -120,11 +149,7 @@ export default function DashboardPage() {
    const [saving, setSaving] = useState(false);
    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
    const [generalError, setGeneralError] = useState("");
-
-   // Form state
    const [form, setForm] = useState<ProductFormData>(emptyForm);
-
-   // ---- fetch products ----------------------------------------------------
 
    const loadProducts = useCallback(() => {
       if (!token) return;
@@ -166,8 +191,6 @@ export default function DashboardPage() {
    const hasActiveFilters =
       search || category !== "All" || minPrice || maxPrice || sort;
 
-   // ---- add product -------------------------------------------------------
-
    const openAddDialog = () => {
       setForm(emptyForm);
       setFormErrors({});
@@ -193,18 +216,12 @@ export default function DashboardPage() {
       if (result.ok) {
          setAddOpen(false);
          loadProducts();
-      } else {
-         if (result.errors) {
-            const fe: Record<string, string> = {};
-            for (const [k, msgs] of Object.entries(result.errors))
-               fe[k] = msgs[0];
-            setFormErrors(fe);
-         }
-         setGeneralError(result.message);
+         return;
       }
-   };
 
-   // ---- edit product ------------------------------------------------------
+      if (result.errors) setFormErrors(extractFieldErrors(result.errors));
+      setGeneralError(result.message);
+   };
 
    const openEditDialog = (product: Product) => {
       setForm({
@@ -233,18 +250,12 @@ export default function DashboardPage() {
       if (result.ok) {
          setEditProduct(null);
          loadProducts();
-      } else {
-         if (result.errors) {
-            const fe: Record<string, string> = {};
-            for (const [k, msgs] of Object.entries(result.errors))
-               fe[k] = msgs[0];
-            setFormErrors(fe);
-         }
-         setGeneralError(result.message);
+         return;
       }
-   };
 
-   // ---- delete product ----------------------------------------------------
+      if (result.errors) setFormErrors(extractFieldErrors(result.errors));
+      setGeneralError(result.message);
+   };
 
    const handleDelete = async () => {
       if (!deleteTarget) return;
@@ -257,12 +268,11 @@ export default function DashboardPage() {
       if (result.ok) {
          setDeleteTarget(null);
          loadProducts();
-      } else {
-         setGeneralError(result.message);
+         return;
       }
-   };
 
-   // ---- form fields -------------------------------------------------------
+      setGeneralError(result.message);
+   };
 
    const renderProductForm = () => (
       <FieldGroup>
@@ -273,9 +283,7 @@ export default function DashboardPage() {
                value={form.title}
                onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
-            {formErrors.title && (
-               <p className="text-sm text-destructive">{formErrors.title}</p>
-            )}
+            <FieldError>{formErrors.title}</FieldError>
          </Field>
          <Field>
             <FieldLabel htmlFor="description">Description</FieldLabel>
@@ -286,11 +294,7 @@ export default function DashboardPage() {
                   setForm({ ...form, description: e.target.value })
                }
             />
-            {formErrors.description && (
-               <p className="text-sm text-destructive">
-                  {formErrors.description}
-               </p>
-            )}
+            <FieldError>{formErrors.description}</FieldError>
          </Field>
          <div className="grid grid-cols-2 gap-4">
             <Field>
@@ -302,9 +306,7 @@ export default function DashboardPage() {
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
                />
-               {formErrors.price && (
-                  <p className="text-sm text-destructive">{formErrors.price}</p>
-               )}
+               <FieldError>{formErrors.price}</FieldError>
             </Field>
             <Field>
                <FieldLabel htmlFor="category">Category</FieldLabel>
@@ -324,11 +326,7 @@ export default function DashboardPage() {
                         </option>
                      ))}
                </select>
-               {formErrors.category && (
-                  <p className="text-sm text-destructive">
-                     {formErrors.category}
-                  </p>
-               )}
+               <FieldError>{formErrors.category}</FieldError>
             </Field>
          </div>
          <Field>
@@ -339,9 +337,7 @@ export default function DashboardPage() {
                value={form.image}
                onChange={(e) => setForm({ ...form, image: e.target.value })}
             />
-            {formErrors.image && (
-               <p className="text-sm text-destructive">{formErrors.image}</p>
-            )}
+            <FieldError>{formErrors.image}</FieldError>
             <FieldDescription>
                Paste the URL of the product image.
             </FieldDescription>
@@ -366,9 +362,7 @@ export default function DashboardPage() {
                      })
                   }
                />
-               {formErrors.rate && (
-                  <p className="text-sm text-destructive">{formErrors.rate}</p>
-               )}
+               <FieldError>{formErrors.rate}</FieldError>
             </Field>
             <Field>
                <FieldLabel htmlFor="count">Review Count</FieldLabel>
@@ -387,16 +381,10 @@ export default function DashboardPage() {
                      })
                   }
                />
-               {formErrors.count && (
-                  <p className="text-sm text-destructive">{formErrors.count}</p>
-               )}
+               <FieldError>{formErrors.count}</FieldError>
             </Field>
          </div>
-         {generalError && (
-            <p className="text-sm text-destructive text-center">
-               {generalError}
-            </p>
-         )}
+         <FieldError className="text-center">{generalError}</FieldError>
       </FieldGroup>
    );
 
@@ -406,7 +394,6 @@ export default function DashboardPage() {
 
          <main className="flex-1 pt-14">
             <div className="px-6 md:px-12 py-6 space-y-6 max-w-7xl mx-auto">
-               {/* Search */}
                <div className="relative max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
@@ -421,7 +408,6 @@ export default function DashboardPage() {
                   />
                </div>
 
-               {/* Filters + Add Product */}
                <div className="flex flex-wrap items-center gap-3">
                   <select
                      value={category}
@@ -489,21 +475,14 @@ export default function DashboardPage() {
                   </div>
                </div>
 
-               {/* Error */}
-               {error && (
-                  <p className="text-sm text-destructive text-center">
-                     {error}
-                  </p>
-               )}
+               <FieldError className="text-center">{error}</FieldError>
 
-               {/* Loading */}
                {loading && (
                   <div className="flex justify-center py-12">
                      <Spinner className="size-6" />
                   </div>
                )}
 
-               {/* Data Table */}
                {!loading && (
                   <div className="rounded-xl border">
                      <Table>
@@ -600,7 +579,6 @@ export default function DashboardPage() {
                   </div>
                )}
 
-               {/* Pagination */}
                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
                   <p>{total} product(s) total.</p>
 
@@ -650,7 +628,6 @@ export default function DashboardPage() {
 
          <Footer />
 
-         {/* VIEW PRODUCT DIALOG */}
          <Dialog
             open={!!viewProduct}
             onOpenChange={(open) => !open && setViewProduct(null)}
@@ -706,7 +683,6 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* ADD PRODUCT DIALOG */}
          <Dialog
             open={addOpen}
             onOpenChange={(open) => {
@@ -743,7 +719,6 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* EDIT PRODUCT DIALOG */}
          <Dialog
             open={!!editProduct}
             onOpenChange={(open) => {
@@ -780,7 +755,6 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* DELETE CONFIRMATION DIALOG */}
          <Dialog
             open={!!deleteTarget}
             onOpenChange={(open) => {
@@ -798,11 +772,7 @@ export default function DashboardPage() {
                      {deleteTarget?.title}&rdquo;? This action cannot be undone.
                   </DialogDescription>
                </DialogHeader>
-               {generalError && (
-                  <p className="text-sm text-destructive text-center">
-                     {generalError}
-                  </p>
-               )}
+               <FieldError className="text-center">{generalError}</FieldError>
                <DialogFooter>
                   <Button
                      variant="outline"
