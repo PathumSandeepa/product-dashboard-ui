@@ -28,11 +28,13 @@ interface AuthState {
    >;
 
    logout: () => void;
+   logoutAsync: () => Promise<void>;
+   refreshToken: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>()(
    persist(
-      (set) => ({
+      (set, get) => ({
          user: null,
          token: null,
          loading: false,
@@ -83,6 +85,37 @@ export const useAuthStore = create<AuthState>()(
 
          logout: () => {
             set({ user: null, token: null });
+         },
+
+         logoutAsync: async () => {
+            const token = get().token;
+            set({ user: null, token: null });
+            if (token) {
+               try {
+                  await apiFetch("/api/logout", {
+                     method: "POST",
+                     token,
+                  });
+               } catch {
+                  // Token already cleared — ignore errors
+               }
+            }
+         },
+
+         refreshToken: async () => {
+            const token = get().token;
+            if (!token) return false;
+            try {
+               const res = await apiFetch<AuthResponse>("/api/refresh", {
+                  method: "POST",
+                  token,
+               });
+               set({ token: res.access_token, user: res.user ?? get().user });
+               return true;
+            } catch {
+               set({ user: null, token: null });
+               return false;
+            }
          },
       }),
       {

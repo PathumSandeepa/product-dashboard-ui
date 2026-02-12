@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, FormEvent } from "react";
+import { useState, useEffect, useCallback, FormEvent } from "react";
 import {
    Search,
    Star,
@@ -54,8 +54,11 @@ import {
 } from "@/components/ui/field";
 
 import { useProductStore } from "@/store/product-store";
+import { useAuthStore } from "@/store/auth-store";
 import type { Product, ProductFormData } from "@/lib/types";
 import { categories, capitalize } from "@/lib/types";
+
+// ---------------------------------------------------------------------------
 
 const emptyForm: ProductFormData = {
    title: "",
@@ -66,9 +69,40 @@ const emptyForm: ProductFormData = {
    rating: { rate: 0, count: 0 },
 };
 
+function validateProduct(data: ProductFormData) {
+   const errs: Record<string, string> = {};
+   if (!data.title.trim()) errs.title = "The product title is required.";
+   else if (data.title.length > 255)
+      errs.title = "Title must not exceed 255 characters.";
+   if (!data.description.trim())
+      errs.description = "The description is required.";
+   if (!data.price && data.price !== "0") errs.price = "The price is required.";
+   else if (Number(data.price) < 0) errs.price = "Price must be 0 or more.";
+   if (!data.category.trim()) errs.category = "The category is required.";
+   if (!data.image.trim()) errs.image = "The image URL is required.";
+   else if (data.image.length > 255)
+      errs.image = "Image URL must not exceed 255 characters.";
+   if (data.rating.rate < 0 || data.rating.rate > 5)
+      errs.rate = "Rating must be between 0 and 5.";
+   if (data.rating.count < 0) errs.count = "Review count must be 0 or more.";
+   return errs;
+}
+
+// ---------------------------------------------------------------------------
+
 export default function DashboardPage() {
-   const { products, loading, addProduct, updateProduct, deleteProduct } =
-      useProductStore();
+   const {
+      products,
+      meta,
+      loading,
+      error,
+      fetchProducts,
+      createProduct,
+      updateProduct,
+      deleteProduct,
+   } = useProductStore();
+
+   const token = useAuthStore((s) => s.token);
 
    // Filters
    const [search, setSearch] = useState("");
@@ -77,7 +111,6 @@ export default function DashboardPage() {
    const [maxPrice, setMaxPrice] = useState("");
    const [sort, setSort] = useState("");
    const [currentPage, setCurrentPage] = useState(1);
-   const [rowsPerPage, setRowsPerPage] = useState(10);
 
    // Dialogs
    const [viewProduct, setViewProduct] = useState<Product | null>(null);
@@ -85,57 +118,41 @@ export default function DashboardPage() {
    const [editProduct, setEditProduct] = useState<Product | null>(null);
    const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
    const [saving, setSaving] = useState(false);
+   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+   const [generalError, setGeneralError] = useState("");
 
+   // Form state
    const [form, setForm] = useState<ProductFormData>(emptyForm);
 
-   // ---- filter + sort -----------------------------------------------------
+   // ---- fetch products ----------------------------------------------------
 
-   const filteredProducts = useMemo(() => {
-      let result = [...products];
+   const loadProducts = useCallback(() => {
+      if (!token) return;
+      fetchProducts({
+         search: search || undefined,
+         category: category !== "All" ? category : undefined,
+         min_price: minPrice || undefined,
+         max_price: maxPrice || undefined,
+         sort: sort || undefined,
+         page: currentPage,
+      });
+   }, [
+      fetchProducts,
+      token,
+      search,
+      category,
+      minPrice,
+      maxPrice,
+      sort,
+      currentPage,
+   ]);
 
-      if (search) {
-         const q = search.toLowerCase();
-         result = result.filter(
-            (p) =>
-               p.title.toLowerCase().includes(q) ||
-               p.description.toLowerCase().includes(q),
-         );
-      }
+   useEffect(() => {
+      loadProducts();
+   }, [loadProducts]);
 
-      if (category !== "All") {
-         result = result.filter((p) => p.category === category);
-      }
-
-      if (minPrice) {
-         result = result.filter(
-            (p) => parseFloat(p.price) >= parseFloat(minPrice),
-         );
-      }
-
-      if (maxPrice) {
-         result = result.filter(
-            (p) => parseFloat(p.price) <= parseFloat(maxPrice),
-         );
-      }
-
-      if (sort === "price_asc") {
-         result.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
-      } else if (sort === "price_desc") {
-         result.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
-      } else if (sort === "newest") {
-         result.sort((a, b) => b.id - a.id);
-      }
-
-      return result;
-   }, [products, search, category, minPrice, maxPrice, sort]);
-
-   // ---- pagination --------------------------------------------------------
-
-   const totalPages = Math.ceil(filteredProducts.length / rowsPerPage) || 1;
-   const paginatedProducts = filteredProducts.slice(
-      (currentPage - 1) * rowsPerPage,
-      currentPage * rowsPerPage,
-   );
+   const totalPages = meta?.last_page ?? 1;
+   const total = meta?.total ?? 0;
 
    const clearFilters = () => {
       setSearch("");
@@ -153,18 +170,38 @@ export default function DashboardPage() {
 
    const openAddDialog = () => {
       setForm(emptyForm);
+      setFormErrors({});
+      setGeneralError("");
       setAddOpen(true);
    };
 
-   const handleAdd = (e: FormEvent) => {
+   const handleAdd = async (e: FormEvent) => {
       e.preventDefault();
+      setFormErrors({});
+      setGeneralError("");
+
+      const errs = validateProduct(form);
+      if (Object.keys(errs).length > 0) {
+         setFormErrors(errs);
+         return;
+      }
+
       setSaving(true);
-      // TODO: replace with API POST /api/products
-      setTimeout(() => {
-         addProduct(form);
-         setSaving(false);
+      const result = await createProduct(form);
+      setSaving(false);
+
+      if (result.ok) {
          setAddOpen(false);
-      }, 400);
+         loadProducts();
+      } else {
+         if (result.errors) {
+            const fe: Record<string, string> = {};
+            for (const [k, msgs] of Object.entries(result.errors))
+               fe[k] = msgs[0];
+            setFormErrors(fe);
+         }
+         setGeneralError(result.message);
+      }
    };
 
    // ---- edit product ------------------------------------------------------
@@ -178,35 +215,54 @@ export default function DashboardPage() {
          image: product.image,
          rating: { ...product.rating },
       });
+      setFormErrors({});
+      setGeneralError("");
       setEditProduct(product);
    };
 
-   const handleEdit = (e: FormEvent) => {
+   const handleEdit = async (e: FormEvent) => {
       e.preventDefault();
       if (!editProduct) return;
+      setFormErrors({});
+      setGeneralError("");
+
       setSaving(true);
-      // TODO: replace with API PUT /api/products/{id}
-      setTimeout(() => {
-         updateProduct(editProduct.id, form);
-         setSaving(false);
+      const result = await updateProduct(editProduct.id, form);
+      setSaving(false);
+
+      if (result.ok) {
          setEditProduct(null);
-      }, 400);
+         loadProducts();
+      } else {
+         if (result.errors) {
+            const fe: Record<string, string> = {};
+            for (const [k, msgs] of Object.entries(result.errors))
+               fe[k] = msgs[0];
+            setFormErrors(fe);
+         }
+         setGeneralError(result.message);
+      }
    };
 
    // ---- delete product ----------------------------------------------------
 
-   const handleDelete = () => {
+   const handleDelete = async () => {
       if (!deleteTarget) return;
       setSaving(true);
-      // TODO: replace with API DELETE /api/products/{id}
-      setTimeout(() => {
-         deleteProduct(deleteTarget.id);
-         setSaving(false);
+      setGeneralError("");
+
+      const result = await deleteProduct(deleteTarget.id);
+      setSaving(false);
+
+      if (result.ok) {
          setDeleteTarget(null);
-      }, 400);
+         loadProducts();
+      } else {
+         setGeneralError(result.message);
+      }
    };
 
-   // ---- shared form fields ------------------------------------------------
+   // ---- form fields -------------------------------------------------------
 
    const renderProductForm = () => (
       <FieldGroup>
@@ -216,8 +272,10 @@ export default function DashboardPage() {
                id="title"
                value={form.title}
                onChange={(e) => setForm({ ...form, title: e.target.value })}
-               required
             />
+            {formErrors.title && (
+               <p className="text-sm text-destructive">{formErrors.title}</p>
+            )}
          </Field>
          <Field>
             <FieldLabel htmlFor="description">Description</FieldLabel>
@@ -227,8 +285,12 @@ export default function DashboardPage() {
                onChange={(e) =>
                   setForm({ ...form, description: e.target.value })
                }
-               required
             />
+            {formErrors.description && (
+               <p className="text-sm text-destructive">
+                  {formErrors.description}
+               </p>
+            )}
          </Field>
          <div className="grid grid-cols-2 gap-4">
             <Field>
@@ -239,8 +301,10 @@ export default function DashboardPage() {
                   step="0.01"
                   value={form.price}
                   onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  required
                />
+               {formErrors.price && (
+                  <p className="text-sm text-destructive">{formErrors.price}</p>
+               )}
             </Field>
             <Field>
                <FieldLabel htmlFor="category">Category</FieldLabel>
@@ -260,6 +324,11 @@ export default function DashboardPage() {
                         </option>
                      ))}
                </select>
+               {formErrors.category && (
+                  <p className="text-sm text-destructive">
+                     {formErrors.category}
+                  </p>
+               )}
             </Field>
          </div>
          <Field>
@@ -270,6 +339,9 @@ export default function DashboardPage() {
                value={form.image}
                onChange={(e) => setForm({ ...form, image: e.target.value })}
             />
+            {formErrors.image && (
+               <p className="text-sm text-destructive">{formErrors.image}</p>
+            )}
             <FieldDescription>
                Paste the URL of the product image.
             </FieldDescription>
@@ -294,6 +366,9 @@ export default function DashboardPage() {
                      })
                   }
                />
+               {formErrors.rate && (
+                  <p className="text-sm text-destructive">{formErrors.rate}</p>
+               )}
             </Field>
             <Field>
                <FieldLabel htmlFor="count">Review Count</FieldLabel>
@@ -312,8 +387,16 @@ export default function DashboardPage() {
                      })
                   }
                />
+               {formErrors.count && (
+                  <p className="text-sm text-destructive">{formErrors.count}</p>
+               )}
             </Field>
          </div>
+         {generalError && (
+            <p className="text-sm text-destructive text-center">
+               {generalError}
+            </p>
+         )}
       </FieldGroup>
    );
 
@@ -386,8 +469,8 @@ export default function DashboardPage() {
                      className="h-9 rounded-md border border-input bg-background text-sm px-3 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                      <option value="">Sort by</option>
-                     <option value="price_asc">Price: Low High</option>
-                     <option value="price_desc">Price: High Low</option>
+                     <option value="price_asc">Price: Low to High</option>
+                     <option value="price_desc">Price: High to Low</option>
                      <option value="newest">Newest First</option>
                   </select>
 
@@ -405,6 +488,13 @@ export default function DashboardPage() {
                      </Button>
                   </div>
                </div>
+
+               {/* Error */}
+               {error && (
+                  <p className="text-sm text-destructive text-center">
+                     {error}
+                  </p>
+               )}
 
                {/* Loading */}
                {loading && (
@@ -427,8 +517,8 @@ export default function DashboardPage() {
                            </TableRow>
                         </TableHeader>
                         <TableBody>
-                           {paginatedProducts.length > 0 ? (
-                              paginatedProducts.map((product) => (
+                           {products && products.length > 0 ? (
+                              products.map((product) => (
                                  <TableRow
                                     key={product.id}
                                     className="cursor-pointer"
@@ -449,11 +539,11 @@ export default function DashboardPage() {
                                        <div className="flex items-center gap-1">
                                           <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
                                           <span className="text-sm">
-                                             {product.rating.rate}
+                                             {product.rating?.rate ?? 0}
                                           </span>
                                        </div>
                                        <span className="text-xs text-muted-foreground">
-                                          {product.rating.count} reviews
+                                          {product.rating?.count ?? 0} reviews
                                        </span>
                                     </TableCell>
                                     <TableCell>
@@ -512,25 +602,9 @@ export default function DashboardPage() {
 
                {/* Pagination */}
                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-                  <p>{filteredProducts.length} product(s) total.</p>
+                  <p>{total} product(s) total.</p>
 
                   <div className="flex items-center gap-6">
-                     <div className="flex items-center gap-2">
-                        <span>Rows per page</span>
-                        <select
-                           value={rowsPerPage}
-                           onChange={(e) => {
-                              setRowsPerPage(Number(e.target.value));
-                              setCurrentPage(1);
-                           }}
-                           className="h-8 w-16 rounded-md border border-input bg-background text-sm px-2"
-                        >
-                           <option value={5}>5</option>
-                           <option value={10}>10</option>
-                           <option value={20}>20</option>
-                        </select>
-                     </div>
-
                      <span>
                         Page {currentPage} of {totalPages}
                      </span>
@@ -576,7 +650,7 @@ export default function DashboardPage() {
 
          <Footer />
 
-         {/* VIEW PRODUCT DIALOG                                              */}
+         {/* VIEW PRODUCT DIALOG */}
          <Dialog
             open={!!viewProduct}
             onOpenChange={(open) => !open && setViewProduct(null)}
@@ -586,7 +660,6 @@ export default function DashboardPage() {
                   <DialogTitle>{viewProduct?.title}</DialogTitle>
                   <DialogDescription>Product details</DialogDescription>
                </DialogHeader>
-
                {viewProduct && (
                   <div className="space-y-4">
                      <ProductImage
@@ -594,11 +667,9 @@ export default function DashboardPage() {
                         alt={viewProduct.title}
                         className="w-full h-48 object-contain bg-muted"
                      />
-
                      <p className="text-sm text-muted-foreground">
                         {viewProduct.description}
                      </p>
-
                      <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                            <span className="text-muted-foreground">Price</span>
@@ -610,24 +681,24 @@ export default function DashboardPage() {
                            <span className="text-muted-foreground">
                               Category
                            </span>
-                           <p>
+                           <div>
                               <Badge variant="secondary">
                                  {capitalize(viewProduct.category)}
                               </Badge>
-                           </p>
+                           </div>
                         </div>
                         <div>
                            <span className="text-muted-foreground">Rating</span>
                            <div className="flex items-center gap-1">
                               <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
-                              <span>{viewProduct.rating.rate}</span>
+                              <span>{viewProduct.rating?.rate ?? 0}</span>
                            </div>
                         </div>
                         <div>
                            <span className="text-muted-foreground">
                               Reviews
                            </span>
-                           <p>{viewProduct.rating.count}</p>
+                           <p>{viewProduct.rating?.count ?? 0}</p>
                         </div>
                      </div>
                   </div>
@@ -635,8 +706,17 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* ADD PRODUCT DIALOG                                               */}
-         <Dialog open={addOpen} onOpenChange={setAddOpen}>
+         {/* ADD PRODUCT DIALOG */}
+         <Dialog
+            open={addOpen}
+            onOpenChange={(open) => {
+               if (!open) {
+                  setAddOpen(false);
+                  setFormErrors({});
+                  setGeneralError("");
+               }
+            }}
+         >
             <DialogContent className="sm:max-w-lg">
                <DialogHeader>
                   <DialogTitle>Add Product</DialogTitle>
@@ -663,10 +743,16 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* EDIT PRODUCT DIALOG                                              */}
+         {/* EDIT PRODUCT DIALOG */}
          <Dialog
             open={!!editProduct}
-            onOpenChange={(open) => !open && setEditProduct(null)}
+            onOpenChange={(open) => {
+               if (!open) {
+                  setEditProduct(null);
+                  setFormErrors({});
+                  setGeneralError("");
+               }
+            }}
          >
             <DialogContent className="sm:max-w-lg">
                <DialogHeader>
@@ -694,10 +780,15 @@ export default function DashboardPage() {
             </DialogContent>
          </Dialog>
 
-         {/* DELETE CONFIRMATION DIALOG                                       */}
+         {/* DELETE CONFIRMATION DIALOG */}
          <Dialog
             open={!!deleteTarget}
-            onOpenChange={(open) => !open && setDeleteTarget(null)}
+            onOpenChange={(open) => {
+               if (!open) {
+                  setDeleteTarget(null);
+                  setGeneralError("");
+               }
+            }}
          >
             <DialogContent className="sm:max-w-sm">
                <DialogHeader>
@@ -707,6 +798,11 @@ export default function DashboardPage() {
                      {deleteTarget?.title}&rdquo;? This action cannot be undone.
                   </DialogDescription>
                </DialogHeader>
+               {generalError && (
+                  <p className="text-sm text-destructive text-center">
+                     {generalError}
+                  </p>
+               )}
                <DialogFooter>
                   <Button
                      variant="outline"

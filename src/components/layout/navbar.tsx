@@ -6,7 +6,7 @@ import { User, LogOut } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function Navbar() {
-   const { user, logout } = useAuthStore();
+   const { user, logoutAsync } = useAuthStore();
    const [isProfileOpen, setIsProfileOpen] = useState(false);
    const profileRef = useRef<HTMLDivElement>(null);
 
@@ -90,8 +90,8 @@ export default function Navbar() {
                            variant="outline"
                            size="sm"
                            className="w-full"
-                           onClick={() => {
-                              logout();
+                           onClick={async () => {
+                              await logoutAsync();
                               window.location.href = "/login";
                            }}
                         >
