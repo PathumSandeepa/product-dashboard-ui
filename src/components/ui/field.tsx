@@ -45,4 +45,17 @@ const FieldDescription = React.forwardRef<
 ));
 FieldDescription.displayName = "FieldDescription";
 
-export { Field, FieldGroup, FieldLabel, FieldDescription };
+function FieldError({
+   className,
+   children,
+   ...props
+}: React.HTMLAttributes<HTMLParagraphElement>) {
+   if (!children) return null;
+   return (
+      <p className={cn("text-sm text-destructive", className)} {...props}>
+         {children}
+      </p>
+   );
+}
+
+export { Field, FieldError, FieldGroup, FieldLabel, FieldDescription };
